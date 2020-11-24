@@ -79,3 +79,37 @@ def entropy(alpha, uncertainty_type, n_bins=10, plot=True):
         plt.hist(entropy, n_bins)
         plt.show()
     return entropy
+
+
+def classification_calibration(labels, alpha, bins=10):
+    probs = torch.nn.functional.normalize(alpha, p=1, dim=-1).detach().cpu().numpy()
+    labels = labels.squeeze().cpu().numpy()
+
+    preds = np.argmax(probs, axis=1)
+    total = labels.shape[0]
+    probs = np.max(probs, axis=1)
+    lower = 0.0
+    increment = 1.0 / bins
+    upper = increment
+    accs = np.zeros([bins + 1], dtype=np.float32)
+    gaps = np.zeros([bins + 1], dtype=np.float32)
+    ECE = 0.0
+    for i in range(bins):
+        ind1 = probs >= lower
+        ind2 = probs < upper
+        ind = np.where(np.logical_and(ind1, ind2))[0]
+        lprobs = probs[ind]
+        lpreds = preds[ind]
+        llabels = labels[ind]
+        acc = np.mean(np.asarray(llabels == lpreds, dtype=np.float32))
+        prob = np.mean(lprobs)
+        if np.isnan(acc):
+            acc = 0.0
+            prob = 0.0
+        ECE += np.abs(acc - prob) * float(lprobs.shape[0])
+        gaps[i] = np.abs(acc - prob)
+        accs[i] = acc
+        upper += increment
+        lower += increment
+    ECE /= np.float(total)
+    return ECE

@@ -1,6 +1,6 @@
 import torch
 import pickle
-from src.results_manager.metrics_prior import accuracy, confidence, brier_score, anomaly_detection
+from src.results_manager.metrics_prior import accuracy, confidence, brier_score, anomaly_detection, classification_calibration
 
 
 use_cuda = torch.cuda.is_available()
@@ -47,10 +47,13 @@ def test(model, test_loader, ood_dataset_loaders, result_path='saved_results'):
         metrics['confidence_aleatoric'] = confidence(Y= orig_Y_all, alpha=alpha_pred_all, score_type='APR', uncertainty_type='aleatoric')
         metrics['confidence_epistemic'] = confidence(Y= orig_Y_all, alpha=alpha_pred_all, score_type='APR', uncertainty_type='epistemic')
         metrics['brier_score'] = brier_score(Y= orig_Y_all, alpha=alpha_pred_all)
+        metrics['ece'] = classification_calibration(orig_Y_all, alpha_pred_all, bins=10)
         for ood_dataset_name, ood_loader in ood_dataset_loaders.items():
-            ood_alpha_pred_all = compute_X_Y_alpha(model, ood_loader, alpha_only=True)
+            ood_Y_all, _, ood_alpha_pred_all = compute_X_Y_alpha(model, ood_loader)
             metrics[f'anomaly_detection_aleatoric_{ood_dataset_name}'] = anomaly_detection(alpha=alpha_pred_all, ood_alpha=ood_alpha_pred_all, score_type='APR', uncertainty_type='aleatoric')
             metrics[f'anomaly_detection_epistemic_{ood_dataset_name}'] = anomaly_detection(alpha=alpha_pred_all, ood_alpha=ood_alpha_pred_all, score_type='APR', uncertainty_type='epistemic')
+            metrics[f'brier_score_{ood_dataset_name}'] = brier_score(Y=ood_Y_all, alpha=ood_alpha_pred_all)
+            metrics[f'ece_{ood_dataset_name}'] = classification_calibration(ood_Y_all, ood_alpha_pred_all, bins=10)
 
     return metrics
 
